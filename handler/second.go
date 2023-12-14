@@ -1,0 +1,47 @@
+package handler
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"redis-task/database"
+	"redis-task/model"
+)
+
+var sr = new(database.SecondRedis)
+
+func (h *Handler) saveStruct(ctx *gin.Context) {
+	var input model.User
+	err := ctx.BindJSON(&input)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, "error no valid values")
+	}
+	err = sr.SaveStructToCache(input)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	ctx.JSON(http.StatusOK, "saved")
+}
+
+func (h *Handler) getStruct(ctx *gin.Context) {
+	data, err := sr.GetStructFromCache()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, map[string]interface{}{"data": data})
+}
+func (h *Handler) updateStruct(ctx *gin.Context) {
+	var updateInput model.UserUpdate
+	err := ctx.BindJSON(&updateInput)
+	if err != nil {
+		ctx.JSON(http.StatusOK, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	data, err := sr.UpdateStructOnCache(updateInput)
+	if err != nil {
+		ctx.JSON(http.StatusOK, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, map[string]interface{}{"data": data})
+}
