@@ -1,8 +1,9 @@
 package database
 
 import (
-	"github.com/go-redis/redis"
+	"context"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 )
@@ -10,6 +11,8 @@ import (
 type RedisDB struct {
 	RedisClient *redis.Client
 }
+
+var ctx = context.Background()
 
 func NewRedisDB() (*RedisDB, error) {
 	err := godotenv.Load()
@@ -21,7 +24,7 @@ func NewRedisDB() (*RedisDB, error) {
 		Password: "",
 		DB:       0,
 	})
-	if err := redisClient.Ping().Err(); err != nil {
+	if err := redisClient.Ping(ctx).Err(); err != nil {
 		log.Fatalf("redis ping error: %v\n", err)
 		return nil, err
 	}

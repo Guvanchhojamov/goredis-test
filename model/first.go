@@ -10,6 +10,6 @@ type Inputs struct {
 }
 
 type ReorderInput struct {
-	Text1   string `json:"text1" db:"text" binding:"required"`
-	OrderId string `json:"order_id" db:"order_id" binding:"required" `
+	Text  string `json:"text" db:"text" binding:"required"`
+	Order string `json:"order" db:"order_id" binding:"required" `
 }

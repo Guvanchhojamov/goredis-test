@@ -17,13 +17,14 @@ func (h *Handler) saveInput(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, "error no valid object")
 		return
 	}
-	fmt.Sprintf("map: %v", input)
 	orderId, err := fpr.SaveData(input)
 	fmt.Println(orderId, err)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, "err: "+err.Error())
+		return
 	}
 	ctx.JSON(http.StatusOK, fmt.Sprintf("Saved to DB and Cache! orderId: %v", orderId))
+	return
 }
 
 func (h *Handler) getInput(ctx *gin.Context) {

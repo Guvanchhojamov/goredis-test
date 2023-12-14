@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -19,6 +20,7 @@ func (s *Server) Run(port string, handlers http.Handler) error {
 		MaxHeaderBytes: 1024,
 	}
 	fmt.Printf("Running at :%s\n", port)
+	fmt.Printf("redis client at %s", os.Getenv("REDIS_ADDRESS"))
 	err := s.httpServer.ListenAndServe()
 	return err
 

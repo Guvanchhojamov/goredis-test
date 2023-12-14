@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"strconv"
 )
 
@@ -15,7 +15,7 @@ var rDB, _ = NewRedisDB()
 var fp = new(FirstPostgres)
 
 func (fr *FirstRedis) checkCache(key string) (bool, error) {
-	res, err := rDB.RedisClient.Exists(key).Result()
+	res, err := rDB.RedisClient.Exists(ctx, key).Result()
 	fmt.Println(err, res)
 	if err != nil || res == 0 {
 		return false, err
@@ -25,7 +25,7 @@ func (fr *FirstRedis) checkCache(key string) (bool, error) {
 
 func (fr *FirstRedis) getFromCache() (interface{}, error) {
 
-	result, err := rDB.RedisClient.ZRange(redisKey, 0, -1).Result()
+	result, err := rDB.RedisClient.ZRange(ctx, redisKey, 0, -1).Result()
 	result = append(result, "storage: From cache")
 	return result, err
 }
@@ -37,7 +37,8 @@ func (fr *FirstRedis) SaveToCache(args [][]string) (result interface{}, err erro
 			Score:  float,
 			Member: val[1],
 		}
-		result = rDB.RedisClient.ZAdd(redisKey, opt).Args()
+
+		result = rDB.RedisClient.ZAdd(ctx, redisKey, opt).Args()
 	}
 
 	fmt.Println(result, err)

@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"redis-task/model"
@@ -37,7 +36,7 @@ func getFromPG() (result []string, errr error) {
 	var text string
 	var forCache [][]string
 	query := fmt.Sprintf(`SELECT  ft.order_id, ft.text FROM %s ft ORDER BY %s ASC`, tableFirst, orderBy)
-	rows, err := db.PDb.Query(context.Background(), query)
+	rows, err := db.PDb.Query(ctx, query)
 	if err == nil {
 		for rows.Next() {
 			rows.Scan(&orderId, &text)
@@ -73,13 +72,32 @@ func savePG(input model.Inputs) (int, [][]string, error) {
 	var orderId string
 	var err error
 	var forCache [][]string
+	var lastorderId int
+	trx, err := db.PDb.Begin(ctx)
+	if err != nil {
+		return 0, nil, err
+	}
+	query := fmt.Sprintf(`SELECT COALESCE(MAX(%s) , 0) FROM %s`, orderBy, tableFirst)
+	row := trx.QueryRow(ctx, query)
+	fmt.Println(row)
+	if err = row.Scan(&lastorderId); err != nil {
+		trx.Rollback(ctx)
+		return 0, nil, err
+	}
+	fmt.Printf("last: %d", lastorderId)
 	for _, val := range input.Text {
-		query := fmt.Sprintf(`INSERT INTO %s (text) VALUES ('%s') RETURNING order_id`, tableFirst, val)
-		err = db.PDb.QueryRow(context.Background(), query).Scan(&orderId)
+		lastorderId++
+		query := fmt.Sprintf(`INSERT INTO %s (text,order_id) VALUES ('%s', %d) RETURNING order_id`, tableFirst, val, lastorderId)
+		err = trx.QueryRow(ctx, query).Scan(&orderId)
+		if err != nil {
+			trx.Rollback(ctx)
+			return 0, nil, err
+		}
 		forCache = append(forCache, []string{orderId, val})
 	}
+
 	id, _ := strconv.Atoi(orderId)
-	return id, forCache, err
+	return id, forCache, trx.Commit(ctx)
 }
 
 //	func (fp *FirstPostgres) ReorderInputs(input model.ReorderInput) (interface{}, error) {
@@ -101,11 +119,7 @@ func (fp *FirstPostgres) ReorderInputs(input model.ReorderInput) (interface{}, e
 
 }
 
-func (fp *FirstPostgres) ReorderSavePG(newScore int, member string) (orderId int, err error) {
-	query := fmt.Sprintf(`UPDATE %s SET order_id = $1  WHERE text=$2 RETURNING order_id`, tableFirst)
-	err = db.PDb.QueryRow(context.Background(), query, newScore, member).Scan(&orderId)
-	if err != nil {
-		return 0, err
-	}
-	return
+func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (orderId int, err error) {
+	//query := fmt.Sprintf(`UPDATE %s SET order_id = $1  WHERE text=$2 RETURNING order_id`)
+	return 0, nil
 }
