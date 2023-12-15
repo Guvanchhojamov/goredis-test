@@ -1,19 +1,24 @@
 package database
 
 import (
+	"fmt"
 	"redis-task/model"
 )
 
 type SecondRedis struct {
 }
 
-var red, _ = NewRedisDB()
-
 const structKey = "users"
 const fieldKey = "user"
 
 func (sr *SecondRedis) SaveStructToCache(input model.User) error {
-
+	keyStr := fmt.Sprintf("%s:%s:%v", structKey, fieldKey, input.Id)
+	fmt.Println(keyStr)
+	result, err := red.RedisClient.HSet(ctx, keyStr, input).Result()
+	if err != nil {
+		return err
+	}
+	fmt.Println(result)
 	return nil
 }
 func (sr *SecondRedis) GetStructFromCache() (users []model.UserResponse, err error) {

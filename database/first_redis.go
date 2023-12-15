@@ -11,11 +11,11 @@ type FirstRedis struct {
 
 const redisKey = "inputs"
 
-var rDB, _ = NewRedisDB()
+var red, _ = NewRedisDB()
 var fp = new(FirstPostgres)
 
 func (fr *FirstRedis) checkCache(key string) (bool, error) {
-	res, err := rDB.RedisClient.Exists(ctx, key).Result()
+	res, err := red.RedisClient.Exists(ctx, key).Result()
 	fmt.Println(err, res)
 	if err != nil || res == 0 {
 		return false, err
@@ -25,7 +25,7 @@ func (fr *FirstRedis) checkCache(key string) (bool, error) {
 
 func (fr *FirstRedis) getFromCache() (interface{}, error) {
 
-	result, err := rDB.RedisClient.ZRange(ctx, redisKey, 0, -1).Result()
+	result, err := red.RedisClient.ZRange(ctx, redisKey, 0, -1).Result()
 	result = append(result, "storage: From cache")
 	return result, err
 }
@@ -38,7 +38,7 @@ func (fr *FirstRedis) SaveToCache(args [][]string) (result interface{}, err erro
 			Member: val[1],
 		}
 
-		result = rDB.RedisClient.ZAdd(ctx, redisKey, opt).Args()
+		result = red.RedisClient.ZAdd(ctx, redisKey, opt).Args()
 	}
 
 	fmt.Println(result, err)
