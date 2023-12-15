@@ -37,14 +37,14 @@ func (h *Handler) updateStruct(ctx *gin.Context) {
 	var updateInput model.UserUpdate
 	err := ctx.BindJSON(&updateInput)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusOK, map[string]interface{}{"error": err.Error()})
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	data, err := sr.UpdateStructOnCache(updateInput)
+
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusOK, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	ctx.JSON(http.StatusOK, map[string]interface{}{"data": data})
+	ctx.JSON(http.StatusOK, map[string]interface{}{"data": "data"})
 	return
 }

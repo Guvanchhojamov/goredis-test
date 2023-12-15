@@ -15,8 +15,7 @@ type UserResponse struct {
 }
 
 type UserUpdate struct {
-	Id       int     `json:"id" redis:"id"  binding:"required"`
-	Username string  `json:"username" redis:"username" binding:"required"`
-	Age      float64 `json:"age" redis:"age" binding:"required"`
-	Address  string  `json:"address" redis:"address" binding:"required"`
+	Username string  `json:"username" redis:"username"`
+	Age      float64 `json:"age" redis:"age" `
+	Address  string  `json:"address" redis:"address"`
 }
