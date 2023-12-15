@@ -7,7 +7,7 @@ import (
 	"redis-task/model"
 )
 
-var sr = new(database.SecondRedis)
+var sr = database.NewSecondRedis()
 
 func (h *Handler) saveStruct(ctx *gin.Context) {
 	var input model.User
@@ -35,16 +35,17 @@ func (h *Handler) getStruct(ctx *gin.Context) {
 }
 func (h *Handler) updateStruct(ctx *gin.Context) {
 	var updateInput model.UserUpdate
+	var id = ctx.Param("id")
 	err := ctx.BindJSON(&updateInput)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 		return
 	}
-
+	err = sr.UpdateStructOnCache(updateInput, id)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusOK, map[string]interface{}{"error": err.Error()})
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	ctx.JSON(http.StatusOK, map[string]interface{}{"data": "data"})
+	ctx.JSON(http.StatusOK, map[string]interface{}{"data": "updated"})
 	return
 }

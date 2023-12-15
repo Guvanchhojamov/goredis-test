@@ -19,7 +19,7 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	{
 		second.GET("", h.getStruct)
 		second.POST("", h.saveStruct)
-		second.PATCH("/:id", h.updateStruct)
+		second.PATCH(":id", h.updateStruct)
 	}
 	return router
 }

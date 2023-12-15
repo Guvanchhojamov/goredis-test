@@ -58,7 +58,6 @@ func getFromPG() (result []string, errr error) {
 
 func (fp *FirstPostgres) SaveData(input model.Inputs) (int, error) {
 	orderId, cacheString, err := savePG(input)
-	fmt.Println(cacheString)
 	if err != nil {
 		return 0, err
 	}
@@ -79,7 +78,6 @@ func savePG(input model.Inputs) (int, [][]string, error) {
 	}
 	query := fmt.Sprintf(`SELECT COALESCE(MAX(%s) , 0) FROM %s`, orderBy, tableFirst)
 	row := trx.QueryRow(ctx, query)
-	fmt.Println(row)
 	if err = row.Scan(&lastorderId); err != nil {
 		trx.Rollback(ctx)
 		return 0, nil, err
@@ -113,13 +111,25 @@ func savePG(input model.Inputs) (int, [][]string, error) {
 //			return data, err
 //		}
 //	}
-func (fp *FirstPostgres) ReorderInputs(input model.ReorderInput) (interface{}, error) {
+func (fp *FirstPostgres) ReorderInputs(input model.ReorderInput) (int, error) {
 	//ok, _ := fr.checkCache(redisKey)
 	return nil, nil
 
 }
 
 func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (orderId int, err error) {
-	//query := fmt.Sprintf(`UPDATE %s SET order_id = $1  WHERE text=$2 RETURNING order_id`)
-	return 0, nil
+	trx, err := db.PDb.Begin(ctx)
+	if err != nil {
+		return
+	}
+	if err != nil {
+		return
+	}
+	var tVal int
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE text=$1 RETURNING %s`, orderBy, tableFirst, orderBy)
+	if err = trx.QueryRow(ctx, query, input.Text).Scan(&tVal); err != nil {
+		trx.Rollback()
+		return
+	}
+	return 0, trx.Commit(ctx)
 }
