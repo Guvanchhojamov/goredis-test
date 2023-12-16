@@ -43,7 +43,7 @@ func (h *Handler) reorderInput(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": "error no valid Reorder object"})
 		return
 	}
-	data, err := fpr.ReorderInputs(input)
+	data, err := fpr.ReorderInput(input)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
