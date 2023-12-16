@@ -16,7 +16,6 @@ var fp = new(FirstPostgres)
 
 func (fr *FirstRedis) checkCache(key string) (bool, error) {
 	res, err := red.RedisClient.Exists(ctx, key).Result()
-	fmt.Println(err, res)
 	if err != nil || res == 0 {
 		return false, err
 	}

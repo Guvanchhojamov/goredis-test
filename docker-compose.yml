@@ -1,0 +1,40 @@
+version: '3'
+services:
+  cache-app:
+    build: ./
+    volumes:
+      - redisapp:/var/lib/go_cache_app
+    ports:
+      - 8085:8080
+    networks:
+      - app-network
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_USER: postgres
+    volumes:
+      - pg:/var/lib/postgres
+    ports:
+      - 5436:5432
+    networks:
+      - app-network
+  redis:
+    image: redis:7-alpine
+    command: redis-server
+    volumes:
+      - redis:/var/lib/redis
+      - redis-config:/usr/local/etc/redis/redis.conf
+    ports:
+      - 6380:6379
+    networks:
+      - app-network
+volumes:
+  redisapp:
+  pg:
+  redis:
+  redis-config:
+networks:
+  app-network:
+    driver: bridge

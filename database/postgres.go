@@ -15,7 +15,7 @@ const (
 	port     = "5436"
 	user     = "postgres"
 	password = "12345"
-	dbname   = "task_db"
+	dbname   = "postgres"
 )
 
 func NewPostgresDB() (*PostgresDb, error) {
