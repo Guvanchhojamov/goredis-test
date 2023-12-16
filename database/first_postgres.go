@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"redis-task/model"
-	"slices"
 	"strconv"
 )
 
@@ -14,8 +13,12 @@ type FirstPostgres struct {
 var fr = new(FirstRedis)
 var db, _ = NewPostgresDB()
 
-const tableFirst = "table_first"
-const orderBy = "order_id"
+const (
+	tableFirst = "table_first"
+	orderBy    = "order_id"
+	decrease   = "-1"
+	increase   = "+1"
+)
 
 func (fp *FirstPostgres) GetData() (interface{}, error) {
 
@@ -99,132 +102,83 @@ func savePG(input model.Inputs) (int, [][]string, error) {
 	return id, forCache, trx.Commit(ctx)
 }
 
-func (fp *FirstPostgres) ReorderInputs(input model.ReorderInput) (int, error) {
-	//ok, _ := fr.checkCache(redisKey)
-	id, err := fp.reorderSavePG(input)
-	if err != nil {
-		return 0, err
+func (fp *FirstPostgres) ReorderInput(input model.ReorderInput) (data interface{}, err error) {
+	isChanged, err := fp.reorderSavePG(input)
+	if err != nil || !isChanged {
+		return
 	}
-	return id, err
-
-}
-
-func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (orderId int, err error) {
-	tVal, err := getTextVal(input)
-	if err != nil {
-		return 0, err
-	}
-	fmt.Println(err, tVal)
-	if tVal == input.Order || input.Order <= 0 {
-		return 1, errors.New("same orders or order is negative")
-	}
-	betweenVals, err := getBetweenVal(input, tVal)
-	//if len(betweenVals) == 1 {
-	//	changeOnOne(input, betweenVals)
-	//}
+	red.RedisClient.Del(ctx, redisKey)
+	data, err = fp.GetData()
 	if err != nil {
 		return
 	}
-	if tVal < input.Order {
-		//todo call func @decBetweens
-		_, err := decBetweens(input, betweenVals)
-		if err != nil {
-			return 0, err
-		}
-
-	} else {
-		//todo call func @incBetweens
-		_, err := incBetweens(input, betweenVals)
-		if err != nil {
-			return 0, err
-		}
-	}
-	data, err := fp.GetData()
-	if err != nil {
-		return 0, err
-	}
-	fmt.Println(betweenVals, data)
 	return
 }
 
-func getTextVal(input model.ReorderInput) (tVal int, err error) {
+func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (isChanged bool, err error) {
+	textOrder, err := getTextOrder(input)
+	if err != nil {
+		return false, err
+	}
+	fmt.Println(err, textOrder)
+	if textOrder == input.Order || input.Order <= 0 {
+		return false, errors.New("same orders or order is negative")
+	}
+	var operator string
+	var betweenStr string
+	if textOrder < input.Order {
+		// #case when order of text small then input order  (Ex: text: "a"=1 order:5 ===>  1<5)
+		betweenStr = fmt.Sprintf("%d AND %d", textOrder+1, input.Order)
+		operator = decrease
+	} else {
+		// #case when order of text bigger then input order  (Ex: text: "a"=4 order:1 ===>  4>1)
+		betweenStr = fmt.Sprintf("%d AND %d", input.Order, textOrder-1)
+		operator = increase
+	}
+	return changePosition(input, betweenStr, operator)
+}
+
+func getTextOrder(input model.ReorderInput) (textOrder int, err error) {
 	query := fmt.Sprintf(`SELECT %s FROM %s WHERE text=$1`, orderBy, tableFirst)
 	fmt.Println(query)
-	err = db.PDb.QueryRow(ctx, query, input.Text).Scan(&tVal)
+	err = db.PDb.QueryRow(ctx, query, input.Text).Scan(&textOrder)
 	return
 }
 
-func getBetweenVal(input model.ReorderInput, tVal int) (betweenVals []int, err error) {
-	var betStr string
-	if tVal < input.Order {
-		betStr = fmt.Sprintf("%d AND %d", tVal+1, input.Order)
-	} else {
-		betStr = fmt.Sprintf("%d AND %d", input.Order, tVal-1)
-	}
-
-	var betweenVal int
-	bquery := fmt.Sprintf(`SELECT %s FROM %s WHERE %s BETWEEN %s`, orderBy, tableFirst, orderBy, betStr)
-	rows, err := db.PDb.Query(ctx, bquery)
-	for rows.Next() {
-		err = rows.Scan(&betweenVal)
-		if err != nil {
-			return
-		}
-		betweenVals = append(betweenVals, betweenVal)
-	}
-	return
-}
-
-func decBetweens(input model.ReorderInput, betweens []int) (int, error) {
-	var query string
-
-	for _, val := range betweens {
-		query += fmt.Sprintf(`UPDATE %s SET %s=%d WHERE %s=%d;`, tableFirst, orderBy, val-1, orderBy, val)
-	}
-	query += fmt.Sprintf(`UPDATE %s SET %s=%d WHERE text=$1;`, tableFirst, orderBy, input.Order)
-	fmt.Println(query)
-	_, err := db.PDb.Query(ctx, query, input.Text)
-	if err != nil {
-		return 0, err
-	}
-	return 1, err
-}
-
-func incBetweens(input model.ReorderInput, betweens []int) (int, error) {
-	var querys string
-	trx, err := db.PDb.Begin(ctx)
-	slices.Reverse(betweens) // Reverse the slice for correct incrementing
-	for _, val := range betweens {
-		querys = fmt.Sprintf(`UPDATE %s SET %s=%d WHERE %s=%d`, tableFirst, orderBy, val+1, orderBy, val)
-		fmt.Println(querys)
-		_, err := trx.Exec(ctx, querys)
-		if err != nil {
-			return 0, err
-		}
-	}
-	queryInc := fmt.Sprintf(`UPDATE %s SET %s=%d WHERE text=$1`, tableFirst, orderBy, input.Order)
-	fmt.Println(queryInc)
-	_, err = trx.Exec(ctx, queryInc, input.Text)
-	if err != nil {
-		return 0, err
-	}
-	return 1, trx.Commit(ctx)
-}
-
-//func changeOnOne(input model.ReorderInput, betweens []int) {
-//	var queryo string
-//	trx, err := db.PDb.Begin(ctx)
-//	queryo = fmt.Sprintf(`UPDATE %s SET %s=%d WHERE %s=%d`, tableFirst, orderBy, val+1, orderBy, val)
-//	fmt.Println(queryo)
-//	_, err := trx.Exec(ctx, querys)
-//	if err != nil {
-//		return 0, err
+//func getBetweenVal(input model.ReorderInput, tVal int) (betweenVals []int, betStr string, err error) {
+//	if tVal < input.Order {
+//		betStr = fmt.Sprintf("%d AND %d", tVal+1, input.Order)
+//	} else {
+//		betStr = fmt.Sprintf("%d AND %d", input.Order, tVal-1)
 //	}
-//	queryInc := fmt.Sprintf(`UPDATE %s SET %s=%d WHERE text=$1`, tableFirst, orderBy, input.Order)
-//	fmt.Println(queryInc)
-//	_, err = trx.Exec(ctx, queryInc, input.Text)
-//	if err != nil {
-//		return 0, err
+//	fmt.Println(betStr)
+//	var betweenVal int
+//	bquery := fmt.Sprintf(`SELECT %s FROM %s WHERE %s BETWEEN %s`, orderBy, tableFirst, orderBy, betStr)
+//	rows, err := db.PDb.Query(ctx, bquery)
+//	for rows.Next() {
+//		err = rows.Scan(&betweenVal)
+//		if err != nil {
+//			return
+//		}
+//		betweenVals = append(betweenVals, betweenVal)
 //	}
-//	return 1, trx.Commit(ctx)
+//	return
 //}
+
+func changePosition(input model.ReorderInput, betweenStr string, operation string) (isCahnged bool, err error) {
+	var query string
+	query = fmt.Sprintf(`UPDATE %s SET %s=COALESCE(%s,0)%s WHERE %s BETWEEN %s AND text<>$1`, tableFirst, orderBy, orderBy, operation, orderBy, betweenStr)
+	fmt.Println(query)
+	trx, err := db.PDb.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	if _, err = trx.Exec(ctx, query, input.Text); err != nil {
+		return false, err
+	}
+	query = fmt.Sprintf(`UPDATE %s SET %s=$1 WHERE text=$2`, tableFirst, orderBy)
+	if _, err = trx.Exec(ctx, query, input.Order, input.Text); err != nil {
+		return false, err
+	}
+	return true, trx.Commit(ctx)
+}

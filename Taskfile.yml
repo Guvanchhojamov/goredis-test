@@ -11,3 +11,6 @@ tasks:
   down:
     cmds:
       - migrate -path ./migration -database "postgres://postgres:12345@localhost:5436/task_db?sslmode=disable" down
+  run:
+    cmds:
+      - go run cmd/main.go

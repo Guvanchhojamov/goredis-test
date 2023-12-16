@@ -12,8 +12,10 @@ func NewSecondRedis() *SecondRedis {
 	return &SecondRedis{}
 }
 
-const structKey = "users"
-const fieldKey = "user"
+const (
+	structKey = "users"
+	fieldKey  = "user"
+)
 
 func (sr *SecondRedis) SaveStructToCache(input model.User) error {
 	keyStr := fmt.Sprintf("%s:%s:%v", structKey, fieldKey, input.Id)
