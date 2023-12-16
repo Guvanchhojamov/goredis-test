@@ -9,7 +9,7 @@ import (
 type FirstRedis struct {
 }
 
-const redisKey = "inputs"
+const inputCacheKey = "inputs"
 
 var red, _ = NewRedisDB()
 var fp = new(FirstPostgres)
@@ -24,24 +24,23 @@ func (fr *FirstRedis) checkCache(key string) (bool, error) {
 }
 
 func (fr *FirstRedis) getFromCache() (interface{}, error) {
-	result, err := red.RedisClient.ZRange(ctx, redisKey, 0, -1).Result()
+	result, err := red.RedisClient.ZRange(ctx, inputCacheKey, 0, -1).Result()
 	result = append(result, "storage: From cache")
 	return result, err
 }
 
 func (fr *FirstRedis) SaveToCache(args [][]string) (result interface{}, err error) {
-	err = red.RedisClient.Del(ctx, redisKey).Err()
+	err = red.RedisClient.Del(ctx, inputCacheKey).Err()
 	if err != nil {
-		return nil, err
+		return
 	}
 	for _, val := range args {
-		float, _ := strconv.ParseFloat(val[0], 64)
+		score, _ := strconv.ParseFloat(val[0], 64)
 		opt := redis.Z{
-			Score:  float,
+			Score:  score,
 			Member: val[1],
 		}
-
-		result = red.RedisClient.ZAdd(ctx, redisKey, opt).Args()
+		result = red.RedisClient.ZAdd(ctx, inputCacheKey, opt).Args()
 	}
 	fmt.Println(result, err)
 	return

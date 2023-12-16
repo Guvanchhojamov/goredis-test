@@ -8,7 +8,7 @@ import (
 	"redis-task/model"
 )
 
-var fpr = new(database.FirstPostgres)
+var fdb = new(database.FirstPostgres)
 
 func (h *Handler) saveInput(ctx *gin.Context) {
 	var input model.Inputs
@@ -17,8 +17,7 @@ func (h *Handler) saveInput(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, "error no valid object")
 		return
 	}
-	orderId, err := fpr.SaveData(input)
-	fmt.Println(orderId, err)
+	orderId, err := fdb.SaveData(input)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, "err: "+err.Error())
 		return
@@ -28,7 +27,7 @@ func (h *Handler) saveInput(ctx *gin.Context) {
 }
 
 func (h *Handler) getInput(ctx *gin.Context) {
-	data, err := fpr.GetData()
+	data, err := fdb.GetData()
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
@@ -43,7 +42,7 @@ func (h *Handler) reorderInput(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": "error no valid Reorder object"})
 		return
 	}
-	data, err := fpr.ReorderInput(input)
+	data, err := fdb.ReorderInput(input)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return

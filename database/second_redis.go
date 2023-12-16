@@ -48,8 +48,6 @@ func (sr *SecondRedis) GetStructFromCache() (users []model.UserResponse, err err
 func (sr *SecondRedis) UpdateStructOnCache(input model.UserUpdate, id string) (err error) {
 	keyStr := fmt.Sprintf("%s:%s:%s", structKey, fieldKey, id)
 	updateStruct := generateUpdateString(input)
-	fullStr := fmt.Sprintf("%s %s", keyStr, updateStruct)
-	fmt.Println(fullStr)
 	res, err := red.RedisClient.HSet(ctx, keyStr, updateStruct).Result()
 	fmt.Println(res, err)
 	if err != nil {

@@ -4,42 +4,40 @@ import (
 	"errors"
 	"fmt"
 	"redis-task/model"
-	"strconv"
 )
 
 type FirstPostgres struct {
 }
 
-var fr = new(FirstRedis)
+var firstRedis = new(FirstRedis)
 var db, _ = NewPostgresDB()
 
 const (
 	tableFirst = "table_first"
-	orderBy    = "order_id"
+	orderField = "order_id"
 	decrease   = "-1"
 	increase   = "+1"
 )
 
 func (fp *FirstPostgres) GetData() (interface{}, error) {
-
-	ok, err := fr.checkCache(redisKey)
+	ok, err := firstRedis.checkCache(inputCacheKey)
 	fmt.Println(ok, err)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		data, err := fr.getFromCache()
+		data, err := firstRedis.getFromCache()
 		return data, err
 	}
-	data, err := getFromPG()
+	data, err := getFromDataBase()
 	return data, err
 }
 
-func getFromPG() (result []string, errr error) {
+func getFromDataBase() (result []string, err error) {
 	var orderId string
 	var text string
 	var forCache [][]string
-	query := fmt.Sprintf(`SELECT ft.order_id, ft.text FROM %s ft ORDER BY %s ASC`, tableFirst, orderBy)
+	query := fmt.Sprintf(`SELECT ft.order_id, ft.text FROM %s ft ORDER BY %s ASC`, tableFirst, orderField)
 	rows, err := db.PDb.Query(ctx, query)
 	if err == nil {
 		for rows.Next() {
@@ -48,66 +46,58 @@ func getFromPG() (result []string, errr error) {
 			result = append(result, text)
 		}
 		if len(result) == 0 {
-			return
+			return result, err
 		}
-		cache, err := fr.SaveToCache(forCache)
+		cache, err := firstRedis.SaveToCache(forCache)
 		if err != nil && cache == nil {
 			result = append(result, "status:Not saved from DB to Cache")
-			return
+			return result, err
 		}
 	}
 	result = append(result, "status:from DB saved to Cache")
-	return
+	return result, err
 }
 
 func (fp *FirstPostgres) SaveData(input model.Inputs) (int, error) {
-	orderId, cacheString, err := savePG(input)
+	id, err := saveToDataBase(input)
 	if err != nil {
 		return 0, err
 	}
-	redResult, err := fr.SaveToCache(cacheString)
-	if redResult == 0 && err != nil {
-		return 0, errors.New("redis save err")
+	err = red.RedisClient.Del(ctx, inputCacheKey).Err()
+	if err != nil {
+		return 0, err
 	}
-	return orderId, err
+	_, err = fp.GetData()
+	return id, err
 }
-func savePG(input model.Inputs) (int, [][]string, error) {
-	var orderId string
-	var err error
-	var forCache [][]string
-	var lastorderId int
+func saveToDataBase(input model.Inputs) (id int, err error) {
 	trx, err := db.PDb.Begin(ctx)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
-	query := fmt.Sprintf(`SELECT COALESCE(MAX(%s) , 0) FROM %s`, orderBy, tableFirst)
-	row := trx.QueryRow(ctx, query)
-	if err = row.Scan(&lastorderId); err != nil {
+	query := fmt.Sprintf(`SELECT COALESCE(MAX(%s) , 0) FROM %s`, orderField, tableFirst)
+	var maxOrder int
+	if err = trx.QueryRow(ctx, query).Scan(&maxOrder); err != nil {
 		trx.Rollback(ctx)
-		return 0, nil, err
+		return
 	}
-	fmt.Printf("last: %d", lastorderId)
-	for _, val := range input.Text {
-		lastorderId++
-		query := fmt.Sprintf(`INSERT INTO %s (text,order_id) VALUES ('%s', %d) RETURNING order_id`, tableFirst, val, lastorderId)
-		err = trx.QueryRow(ctx, query).Scan(&orderId)
-		if err != nil {
-			trx.Rollback(ctx)
-			return 0, nil, err
-		}
-		forCache = append(forCache, []string{orderId, val})
+	insertValuesStr := generateInsertValues(input, maxOrder)
+	query = fmt.Sprintf(`INSERT INTO %s (text,order_id) VALUES %s`, tableFirst, insertValuesStr)
+	fmt.Println(query)
+	_, err = trx.Exec(ctx, query)
+	if err != nil {
+		trx.Rollback(ctx)
+		return
 	}
-
-	id, _ := strconv.Atoi(orderId)
-	return id, forCache, trx.Commit(ctx)
+	return 1, trx.Commit(ctx)
 }
 
 func (fp *FirstPostgres) ReorderInput(input model.ReorderInput) (data interface{}, err error) {
-	isChanged, err := fp.reorderSavePG(input)
+	isChanged, err := fp.reorderSaveToDatabase(input)
 	if err != nil || !isChanged {
 		return
 	}
-	red.RedisClient.Del(ctx, redisKey)
+	red.RedisClient.Del(ctx, inputCacheKey)
 	data, err = fp.GetData()
 	if err != nil {
 		return
@@ -115,7 +105,7 @@ func (fp *FirstPostgres) ReorderInput(input model.ReorderInput) (data interface{
 	return
 }
 
-func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (isChanged bool, err error) {
+func (fp *FirstPostgres) reorderSaveToDatabase(input model.ReorderInput) (isChanged bool, err error) {
 	textOrder, err := getTextOrder(input)
 	if err != nil {
 		return false, err
@@ -139,35 +129,15 @@ func (fp *FirstPostgres) reorderSavePG(input model.ReorderInput) (isChanged bool
 }
 
 func getTextOrder(input model.ReorderInput) (textOrder int, err error) {
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE text=$1`, orderBy, tableFirst)
+	query := fmt.Sprintf(`SELECT %s FROM %s WHERE text=$1`, orderField, tableFirst)
 	fmt.Println(query)
 	err = db.PDb.QueryRow(ctx, query, input.Text).Scan(&textOrder)
 	return
 }
 
-//func getBetweenVal(input model.ReorderInput, tVal int) (betweenVals []int, betStr string, err error) {
-//	if tVal < input.Order {
-//		betStr = fmt.Sprintf("%d AND %d", tVal+1, input.Order)
-//	} else {
-//		betStr = fmt.Sprintf("%d AND %d", input.Order, tVal-1)
-//	}
-//	fmt.Println(betStr)
-//	var betweenVal int
-//	bquery := fmt.Sprintf(`SELECT %s FROM %s WHERE %s BETWEEN %s`, orderBy, tableFirst, orderBy, betStr)
-//	rows, err := db.PDb.Query(ctx, bquery)
-//	for rows.Next() {
-//		err = rows.Scan(&betweenVal)
-//		if err != nil {
-//			return
-//		}
-//		betweenVals = append(betweenVals, betweenVal)
-//	}
-//	return
-//}
-
 func changePosition(input model.ReorderInput, betweenStr string, operation string) (isCahnged bool, err error) {
 	var query string
-	query = fmt.Sprintf(`UPDATE %s SET %s=COALESCE(%s,0)%s WHERE %s BETWEEN %s AND text<>$1`, tableFirst, orderBy, orderBy, operation, orderBy, betweenStr)
+	query = fmt.Sprintf(`UPDATE %s SET %s=COALESCE(%s,0)%s WHERE %s BETWEEN %s AND text<>$1`, tableFirst, orderField, orderField, operation, orderField, betweenStr)
 	fmt.Println(query)
 	trx, err := db.PDb.Begin(ctx)
 	if err != nil {
@@ -176,9 +146,21 @@ func changePosition(input model.ReorderInput, betweenStr string, operation strin
 	if _, err = trx.Exec(ctx, query, input.Text); err != nil {
 		return false, err
 	}
-	query = fmt.Sprintf(`UPDATE %s SET %s=$1 WHERE text=$2`, tableFirst, orderBy)
+	query = fmt.Sprintf(`UPDATE %s SET %s=$1 WHERE text=$2`, tableFirst, orderField)
 	if _, err = trx.Exec(ctx, query, input.Order, input.Text); err != nil {
 		return false, err
 	}
 	return true, trx.Commit(ctx)
+}
+
+func generateInsertValues(input model.Inputs, maxOrder int) (insertValuesStr string) {
+	for i, val := range input.Text {
+		maxOrder++
+		if i == len(input.Text)-1 {
+			insertValuesStr += fmt.Sprintf(`('%s', %d)`, val, maxOrder) // poslednaya bez zapyataya
+		} else {
+			insertValuesStr += fmt.Sprintf(`('%s', %d),`, val, maxOrder)
+		}
+	}
+	return
 }
