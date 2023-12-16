@@ -11,5 +11,5 @@ type Inputs struct {
 
 type ReorderInput struct {
 	Text  string `json:"text" db:"text" binding:"required"`
-	Order string `json:"order" db:"order_id" binding:"required" `
+	Order int    `json:"order" db:"order_id" binding:"required" `
 }

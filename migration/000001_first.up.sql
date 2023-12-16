@@ -3,6 +3,6 @@ CREATE TABLE IF NOT EXISTS table_first
 (
     id serial unique primary key,
     text varchar(255) not null unique ,
-    order_id serial not null
+    order_id int not null
 );
 
