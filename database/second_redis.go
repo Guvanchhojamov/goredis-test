@@ -68,10 +68,3 @@ func generateUpdateString(input model.UserUpdate) interface{} {
 	}
 	return updateStruct
 }
-func checkCacheField(field string) (bool, error) {
-	return red.RedisClient.HExists(ctx, structKey, field).Result()
-}
-
-//func checkStructCacheKey(key string) (int64, error) {
-//	return red.RedisClient.Exists(key).Result()
-//}

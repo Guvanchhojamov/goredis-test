@@ -40,13 +40,14 @@ func (h *Handler) reorderInput(ctx *gin.Context) {
 	var input model.ReorderInput
 	err := ctx.BindJSON(&input)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, "error no valid Reorder object")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, map[string]interface{}{"error": "error no valid Reorder object"})
 		return
 	}
 	data, err := fpr.ReorderInputs(input)
 	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	ctx.AbortWithStatusJSON(http.StatusOK, data)
+	ctx.JSON(http.StatusOK, data)
 	return
 }
