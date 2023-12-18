@@ -164,9 +164,9 @@ func generateInsertValues(input model.Inputs, maxOrder int) (insertValuesStr str
 		maxOrder++
 		if i == len(input.Text)-1 {
 			insertValuesStr += fmt.Sprintf(`('%s', %d)`, val, maxOrder) // poslednaya bez zapyataya
-		} else {
-			insertValuesStr += fmt.Sprintf(`('%s', %d),`, val, maxOrder)
+			return
 		}
+		insertValuesStr += fmt.Sprintf(`('%s', %d),`, val, maxOrder)
 	}
 	return
 }
