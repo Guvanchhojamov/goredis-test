@@ -34,26 +34,30 @@ func (fp *FirstPostgres) GetData() (interface{}, error) {
 }
 
 func getFromDataBase() (result []string, err error) {
-	var orderId string
-	var text string
-	var forCache [][]string
+	var (
+		orderId  string
+		text     string
+		forCache [][]string
+	)
 	query := fmt.Sprintf(`SELECT ft.order_id, ft.text FROM %s ft ORDER BY %s ASC`, tableFirst, orderField)
 	rows, err := db.PDb.Query(ctx, query)
-	if err == nil {
-		for rows.Next() {
-			rows.Scan(&orderId, &text)
-			forCache = append(forCache, []string{orderId, text})
-			result = append(result, text)
-		}
-		if len(result) == 0 {
-			return result, err
-		}
-		cache, err := firstRedis.SaveToCache(forCache)
-		if err != nil && cache == nil {
-			result = append(result, "status:Not saved from DB to Cache")
-			return result, err
-		}
+	if err != nil {
+		return nil, err
 	}
+	for rows.Next() {
+		rows.Scan(&orderId, &text)
+		forCache = append(forCache, []string{orderId, text})
+		result = append(result, text)
+	}
+	if len(result) == 0 {
+		return result, err
+	}
+	cache, err := firstRedis.SaveToCache(forCache)
+	if err != nil && cache == nil {
+		result = append(result, "status:Not saved from DB to Cache")
+		return result, err
+	}
+
 	result = append(result, "status:from DB saved to Cache")
 	return result, err
 }
@@ -114,8 +118,10 @@ func (fp *FirstPostgres) reorderSaveToDatabase(input model.ReorderInput) (isChan
 	if textOrder == input.Order || input.Order <= 0 {
 		return false, errors.New("same orders or order is negative")
 	}
-	var operator string
-	var betweenStr string
+	var (
+		operator   string
+		betweenStr string
+	)
 	if textOrder < input.Order {
 		// #case when order of text small then input order  (Ex: text: "a"=1 order:5 ===>  1<5)
 		betweenStr = fmt.Sprintf("%d AND %d", textOrder+1, input.Order)
